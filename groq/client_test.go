@@ -54,7 +54,7 @@ func TestGenerateTranslatesRequestAndEvents(t *testing.T) {
 			Config:     json.RawMessage(`{"endpoint":"https://example.test/v1/chat/completions","model":"test-model"}`),
 		},
 		Instructions: "be concise",
-		Messages: []ai.Message{{Role: ai.RoleUser, Content: "hi"}},
+		Messages:     []ai.Message{{Role: ai.RoleUser, Content: "hi"}},
 		Tools: []ai.ToolDefinition{{
 			Name:       "lookup",
 			Parameters: json.RawMessage(`{"type":"object"}`),

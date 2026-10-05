@@ -10,9 +10,9 @@ type message struct {
 }
 
 type messageCall struct {
-	ID       string          `json:"id"`
-	Type     string          `json:"type"`
-	Function functionCall    `json:"function"`
+	ID       string       `json:"id"`
+	Type     string       `json:"type"`
+	Function functionCall `json:"function"`
 }
 
 type functionCall struct {
@@ -32,13 +32,13 @@ type functionDefinition struct {
 }
 
 type completionRequest struct {
-	Model               string         `json:"model"`
-	Messages            []message      `json:"messages"`
-	Stream              bool           `json:"stream"`
-	StreamOptions       streamOptions  `json:"stream_options"`
-	Temperature         *float64       `json:"temperature,omitempty"`
-	MaxCompletionTokens int            `json:"max_completion_tokens,omitempty"`
-	Tools               []tool         `json:"tools,omitempty"`
+	Model               string        `json:"model"`
+	Messages            []message     `json:"messages"`
+	Stream              bool          `json:"stream"`
+	StreamOptions       streamOptions `json:"stream_options"`
+	Temperature         *float64      `json:"temperature,omitempty"`
+	MaxCompletionTokens int           `json:"max_completion_tokens,omitempty"`
+	Tools               []tool        `json:"tools,omitempty"`
 }
 
 type streamOptions struct {
