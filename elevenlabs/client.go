@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/leamout/ai-providers/internal/transport"
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 type client struct {
