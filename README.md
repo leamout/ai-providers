@@ -2,10 +2,10 @@
 
 Official AI provider adapters for the Leamout Agent Runtime.
 
-Provider-neutral contracts live in `github.com/leamout/sdk/ai`. This repository owns vendor-specific clients, configuration validation, credential verification, protocol translation, and normalized event mapping. Runtime orchestration, tenant configuration, telephony, and media session lifecycle remain in `github.com/leamout/leamout`.
+Provider-neutral contracts live in `github.com/leamout/contracts/ai`. This repository owns vendor-specific clients, configuration validation, credential verification, protocol translation, and normalized event mapping. Runtime orchestration, tenant configuration, telephony, and media session lifecycle remain in `github.com/leamout/leamout`.
 
 ```text
-leamout/sdk
+leamout/contracts
     ↑
 leamout/ai-providers
     ↑
@@ -55,7 +55,7 @@ Packages are organized by vendor rather than role. Each package follows the same
 └── ...
 ```
 
-`config.go` owns provider defaults and runtime configuration validation. `provider.go` is the SDK adapter boundary. `client.go` owns upstream authentication, request construction, and connection setup. `stream.go` owns live stream lifecycle and normalized SDK events. `model.go` contains vendor wire types when they justify a separate file.
+`config.go` owns provider defaults and runtime configuration validation. `provider.go` is the contracts adapter boundary. `client.go` owns upstream authentication, request construction, and connection setup. `stream.go` owns live stream lifecycle and normalized contract events. `model.go` contains vendor wire types when they justify a separate file.
 
 Shared code under `internal/` is intentionally limited to low-level transport mechanics. Provider-specific lifecycle and protocol behavior belongs in the vendor package.
 
@@ -113,7 +113,7 @@ leamout/leamout
     ↓
 leamout/ai-providers
     ↓
-leamout/sdk
+leamout/contracts
 ```
 
 Provider packages must not depend on the Leamout runtime.
