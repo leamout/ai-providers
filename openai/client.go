@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -25,9 +26,9 @@ func newClient(httpClient *http.Client) *client {
 func (c *client) generate(
 	ctx context.Context,
 	credential string,
-	cfg LLMConfig,
+	cfg Config,
 	request ai.LLMRequest,
-) (*llmStream, error) {
+) (*stream, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("openai context is required")
 	}
@@ -101,67 +102,11 @@ func (c *client) generate(
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer func() { _ = resp.Body.Close() }()
-		return nil, fmt.Errorf("start OpenAI stream: HTTP %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		return nil, fmt.Errorf("start OpenAI stream: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	result := newLLMStream(ctx, resp.Body)
+	result := newStream(ctx, resp.Body)
 	go result.readLoop()
 	return result, nil
-}
-
-func (c *client) synthesize(
-	ctx context.Context,
-	credential string,
-	cfg TTSConfig,
-	text string,
-) (*http.Response, error) {
-	credential = strings.TrimSpace(credential)
-	if credential == "" {
-		return nil, fmt.Errorf("openai credential is required")
-	}
-	payload, err := json.Marshal(speechRequest{
-		Model:          cfg.Model,
-		Voice:          cfg.Voice,
-		Input:          text,
-		ResponseFormat: "pcm",
-		Speed:          cfg.Speed,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encode OpenAI speech request: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("create OpenAI speech request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+credential)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("start OpenAI speech synthesis: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		defer func() { _ = resp.Body.Close() }()
-		return nil, fmt.Errorf("start OpenAI speech synthesis: HTTP %d", resp.StatusCode)
-	}
-	return resp, nil
-}
-
-func (c *client) startTTS(
-	ctx context.Context,
-	credential string,
-	cfg TTSConfig,
-	format ai.AudioFormat,
-) (*ttsStream, error) {
-	if ctx == nil {
-		return nil, fmt.Errorf("openai context is required")
-	}
-	if format != (ai.AudioFormat{Encoding: ai.AudioEncodingPCM16LE, SampleRateHz: 24000, Channels: 1}) {
-		return nil, fmt.Errorf("openai TTS requires PCM16 mono at 24000 Hz")
-	}
-	stream := newTTSStream(ctx, format, func(ctx context.Context, text string) (*http.Response, error) {
-		return c.synthesize(ctx, credential, cfg, text)
-	})
-	go stream.run()
-	return stream, nil
 }
