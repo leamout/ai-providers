@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 type client struct {
