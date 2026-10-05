@@ -74,11 +74,3 @@ type usage struct {
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 }
-
-type speechRequest struct {
-	Model          string  `json:"model"`
-	Voice          string  `json:"voice"`
-	Input          string  `json:"input"`
-	ResponseFormat string  `json:"response_format"`
-	Speed          float64 `json:"speed"`
-}
