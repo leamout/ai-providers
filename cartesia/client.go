@@ -48,8 +48,8 @@ func (c *client) start(ctx context.Context, credential string, cfg Config, forma
 	parsed.RawQuery = query.Encode()
 
 	connection, response, err := websocket.Dial(ctx, parsed.String(), &websocket.DialOptions{
-		HTTPClient: c.httpClient,
-		HTTPHeader: http.Header{"X-API-Key": []string{credential}},
+		HTTPClient:      c.httpClient,
+		HTTPHeader:      http.Header{"X-API-Key": []string{credential}},
 		CompressionMode: websocket.CompressionDisabled,
 	})
 	if response != nil && response.Body != nil {
