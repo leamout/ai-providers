@@ -46,6 +46,8 @@ type stream struct {
 	request    generationRequest
 	events     chan ai.TTSEvent
 	writeMu    sync.Mutex
+	sendMu     sync.Mutex
+	final      bool
 	closeOnce  sync.Once
 }
 
@@ -54,13 +56,22 @@ func newStream(ctx context.Context, cancel context.CancelFunc, connection *webso
 }
 
 func (s *stream) SendText(ctx context.Context, chunk ai.TextChunk) error {
-	if chunk.Text == "" {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+	if s.final {
+		return fmt.Errorf("cartesia text already finalized")
+	}
+	if chunk.Text == "" && !chunk.Final {
 		return fmt.Errorf("cartesia transcript is required")
 	}
 	request := s.request
 	request.Transcript = chunk.Text
 	request.Continue = !chunk.Final
-	return s.writeJSON(ctx, request)
+	if err := s.writeJSON(ctx, request); err != nil {
+		return err
+	}
+	s.final = chunk.Final
+	return nil
 }
 
 func (s *stream) Events() <-chan ai.TTSEvent { return s.events }
@@ -68,9 +79,7 @@ func (s *stream) Events() <-chan ai.TTSEvent { return s.events }
 func (s *stream) Close() error {
 	var err error
 	s.closeOnce.Do(func() {
-		closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		_ = s.writeJSON(closeCtx, map[string]any{"context_id": s.contextID, "cancel": true})
+
 		s.cancel()
 		err = s.connection.CloseNow()
 	})
@@ -78,6 +87,12 @@ func (s *stream) Close() error {
 }
 
 func (s *stream) writeJSON(ctx context.Context, value any) error {
+	if ctx == nil {
+		return fmt.Errorf("cartesia context is required")
+	}
+	if err := s.ctx.Err(); err != nil {
+		return err
+	}
 	payload, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -88,6 +103,8 @@ func (s *stream) writeJSON(ctx context.Context, value any) error {
 }
 
 func (s *stream) readLoop() {
+	stop := context.AfterFunc(s.ctx, func() { _ = s.connection.CloseNow() })
+	defer stop()
 	defer close(s.events)
 	defer func() { _ = s.Close() }()
 	for {

@@ -114,7 +114,7 @@ requests and audible prosody changes. `Done` marks successful completion;
 | AssemblyAI STT | Mono PCM16LE or mulaw, 8–48 kHz; each frame must contain 50–1000 ms. |
 | Google STT | Mono PCM16LE or mulaw, 8–48 kHz; frames limited to 25 KiB. |
 | Azure STT | Mono PCM16LE at 8 or 16 kHz. |
-| Cartesia TTS | Mono PCM16LE at 8, 16, 22.05, 24, 44.1, or 48 kHz; mulaw/alaw at 8 kHz. |
+| Cartesia TTS | Mono PCM16LE at 8, 16, 22.05, 24, 44.1, or 48 kHz. |
 | ElevenLabs TTS | Mono PCM16LE at 8, 16, 22.05, 24, 44.1, or 48 kHz; mulaw/alaw at 8 kHz. Some formats require paid plans. |
 | OpenAI TTS | Mono PCM16LE at 24 kHz. |
 | Azure TTS | Mono PCM16LE at 8, 16, 24, or 48 kHz; mulaw/alaw at 8 kHz. |
