@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 // Provider implements AssemblyAI streaming speech-to-text.
