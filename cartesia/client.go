@@ -3,6 +3,7 @@ package cartesia
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -93,11 +94,6 @@ func validateAudioFormat(format ai.AudioFormat) error {
 	if format.Channels != 1 {
 		return fmt.Errorf("cartesia requires mono audio")
 	}
-	switch format.SampleRateHz {
-	case 8000, 16000, 22050, 24000, 44100, 48000:
-	default:
-		return fmt.Errorf("unsupported Cartesia sample rate %d", format.SampleRateHz)
-	}
 	return nil
 }
 
@@ -106,7 +102,5 @@ func newContextID() (string, error) {
 	if _, err := rand.Read(raw[:]); err != nil {
 		return "", fmt.Errorf("create Cartesia context ID: %w", err)
 	}
-	raw[6] = (raw[6] & 0x0f) | 0x40
-	raw[8] = (raw[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", raw[:4], raw[4:6], raw[6:8], raw[8:10], raw[10:]), nil
+	return hex.EncodeToString(raw[:]), nil
 }
