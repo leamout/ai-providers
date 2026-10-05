@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 func TestGenerateTranslatesRequestAndEvents(t *testing.T) {

@@ -1,4 +1,4 @@
-package groq
+package openai
 
 import (
 	"bytes"
@@ -23,16 +23,21 @@ func newClient(httpClient *http.Client) *client {
 	return &client{httpClient: httpClient}
 }
 
-func (c *client) generate(ctx context.Context, credential string, cfg Config, request ai.LLMRequest) (*stream, error) {
+func (c *client) generate(
+	ctx context.Context,
+	credential string,
+	cfg Config,
+	request ai.LLMRequest,
+) (*stream, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf("groq context is required")
+		return nil, fmt.Errorf("openai context is required")
 	}
 	credential = strings.TrimSpace(credential)
 	if credential == "" {
-		return nil, fmt.Errorf("groq credential is required")
+		return nil, fmt.Errorf("openai credential is required")
 	}
 	if len(request.Messages) == 0 && strings.TrimSpace(request.Instructions) == "" {
-		return nil, fmt.Errorf("groq messages are required")
+		return nil, fmt.Errorf("openai messages are required")
 	}
 
 	messages := make([]message, 0, len(request.Messages)+1)
@@ -80,12 +85,12 @@ func (c *client) generate(ctx context.Context, credential string, cfg Config, re
 		Tools:               tools,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("encode Groq request: %w", err)
+		return nil, fmt.Errorf("encode OpenAI request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, fmt.Errorf("create Groq request: %w", err)
+		return nil, fmt.Errorf("create OpenAI request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+credential)
 	req.Header.Set("Content-Type", "application/json")
@@ -93,12 +98,12 @@ func (c *client) generate(ctx context.Context, credential string, cfg Config, re
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("start Groq stream: %w", err)
+		return nil, fmt.Errorf("start OpenAI stream: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-		return nil, fmt.Errorf("start Groq stream: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("start OpenAI stream: HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	result := newStream(ctx, resp.Body)

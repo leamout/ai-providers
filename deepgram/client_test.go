@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 func TestBuildEndpoint(t *testing.T) {
