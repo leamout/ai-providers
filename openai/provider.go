@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 const verifyEndpoint = "https://api.openai.com/v1/models"
