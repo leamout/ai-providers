@@ -8,7 +8,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/leamout/ai-providers/internal/transport"
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 type stream struct {
