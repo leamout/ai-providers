@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 const verifyEndpoint = "https://api.cartesia.ai/models"
