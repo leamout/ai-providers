@@ -1,4 +1,4 @@
-// Package openai implements OpenAI language-model and text-to-speech adapters.
+// Package openai implements OpenAI language-model adapters.
 package openai
 
 import (
@@ -13,15 +13,12 @@ import (
 
 const verifyEndpoint = "https://api.openai.com/v1/models"
 
-type LLM struct {
+// Provider implements OpenAI streaming language-model generation.
+type Provider struct {
 	HTTPClient *http.Client
 }
 
-type TTS struct {
-	HTTPClient *http.Client
-}
-
-func (LLM) Descriptor() ai.Descriptor {
+func (Provider) Descriptor() ai.Descriptor {
 	return ai.Descriptor{
 		ID:   "openai",
 		Name: "OpenAI",
@@ -34,38 +31,18 @@ func (LLM) Descriptor() ai.Descriptor {
 	}
 }
 
-func (TTS) Descriptor() ai.Descriptor {
-	return ai.Descriptor{
-		ID:           "openai",
-		Name:         "OpenAI",
-		Kind:         ai.KindTTS,
-		Capabilities: []ai.Capability{ai.CapabilityStreaming},
-	}
-}
-
-func (LLM) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeLLMConfig(raw)
+func (Provider) ValidateConfig(raw json.RawMessage) error {
+	_, err := decodeConfig(raw)
 	return err
 }
 
-func (TTS) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeTTSConfig(raw)
-	return err
-}
-
-func (p LLM) VerifyCredential(ctx context.Context, credential string) error {
-	return verifyCredential(ctx, p.HTTPClient, credential)
-}
-
-func (p TTS) VerifyCredential(ctx context.Context, credential string) error {
-	return verifyCredential(ctx, p.HTTPClient, credential)
-}
-
-func verifyCredential(ctx context.Context, client *http.Client, credential string) error {
+func (p Provider) VerifyCredential(ctx context.Context, credential string) error {
 	credential = strings.TrimSpace(credential)
 	if credential == "" {
 		return fmt.Errorf("openai credential is required")
 	}
+
+	client := p.HTTPClient
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -88,28 +65,14 @@ func verifyCredential(ctx context.Context, client *http.Client, credential strin
 	return nil
 }
 
-func (p LLM) Generate(ctx context.Context, request ai.LLMRequest) (ai.LLMStream, error) {
-	cfg, err := decodeLLMConfig(request.Runtime.Config)
+func (p Provider) Generate(ctx context.Context, request ai.LLMRequest) (ai.LLMStream, error) {
+	cfg, err := decodeConfig(request.Runtime.Config)
 	if err != nil {
 		return nil, err
 	}
 	return newClient(p.HTTPClient).generate(ctx, request.Runtime.Credential, cfg, request)
 }
 
-func (p TTS) StartTTS(ctx context.Context, request ai.TTSRequest) (ai.TTSStream, error) {
-	cfg, err := decodeTTSConfig(request.Runtime.Config)
-	if err != nil {
-		return nil, err
-	}
-	if voice := strings.TrimSpace(request.Voice); voice != "" {
-		cfg.Voice = voice
-	}
-	return newClient(p.HTTPClient).startTTS(ctx, request.Runtime.Credential, cfg, request.Format)
-}
-
-var _ ai.LLM = LLM{}
-var _ ai.TTS = TTS{}
-var _ ai.ConfigValidator = LLM{}
-var _ ai.ConfigValidator = TTS{}
-var _ ai.CredentialVerifier = LLM{}
-var _ ai.CredentialVerifier = TTS{}
+var _ ai.LLM = Provider{}
+var _ ai.ConfigValidator = Provider{}
+var _ ai.CredentialVerifier = Provider{}
