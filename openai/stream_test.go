@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 func TestStreamMapsOpenAIEvents(t *testing.T) {
