@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/coder/websocket"
-	"github.com/leamout/sdk/ai"
+	"github.com/leamout/contracts/ai"
 )
 
 type client struct {
