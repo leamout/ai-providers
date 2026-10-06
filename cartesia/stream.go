@@ -91,6 +91,12 @@ func (s *stream) Close() error {
 	s.closeOnce.Do(func() {
 		closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+		// The watchdog must not acquire writeMu: a stalled writer can hold it.
+		stop := context.AfterFunc(closeCtx, func() {
+			s.cancel()
+			_ = s.connection.CloseNow()
+		})
+		defer stop()
 		_ = s.writeJSON(closeCtx, map[string]any{"context_id": s.contextID, "cancel": true})
 		s.cancel()
 		err = s.connection.CloseNow()

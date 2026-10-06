@@ -102,7 +102,7 @@ for event := range stream.Events() {
 }
 ```
 
-AssemblyAI emits `speech.started` on the first non-empty transcript for each upstream turn. This provides a normalized start event, but its timing depends on transcription latency rather than an immediate voice activity signal.
+AssemblyAI maps native `SpeechStarted` events when the upstream model provides them. For models without that signal, it emits `speech.started` on the first non-empty transcript of each turn; this fallback depends on transcription latency. Speech stop is emitted once per completed turn, independently of transcript formatting.
 
 ## Boundaries
 
