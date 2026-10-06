@@ -101,7 +101,7 @@ func (p RealtimeProvider) StartRealtime(
 		return nil, err
 	}
 
-	return newRealtimeClient(p.HTTPClient).start(ctx, cfg, request)
+	return newClient(p.HTTPClient).start(ctx, cfg, request)
 }
 
 func verifyCredential(
