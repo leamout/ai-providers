@@ -33,6 +33,7 @@ type response struct {
 	Data       string `json:"data"`
 	StatusCode int    `json:"status_code"`
 	RequestID  string `json:"request_id"`
+	ContextID  string `json:"context_id"`
 	Message    string `json:"message"`
 	ErrorCode  string `json:"error_code"`
 }
@@ -47,6 +48,7 @@ type stream struct {
 	events     chan ai.TTSEvent
 	writeMu    sync.Mutex
 	closeOnce  sync.Once
+	final      bool
 }
 
 func newStream(ctx context.Context, cancel context.CancelFunc, connection *websocket.Conn, format ai.AudioFormat, contextID string) *stream {
@@ -54,13 +56,32 @@ func newStream(ctx context.Context, cancel context.CancelFunc, connection *webso
 }
 
 func (s *stream) SendText(ctx context.Context, chunk ai.TextChunk) error {
-	if chunk.Text == "" {
-		return fmt.Errorf("cartesia transcript is required")
+	if ctx == nil {
+		return fmt.Errorf("cartesia context is required")
+	}
+	if chunk.Text == "" && !chunk.Final {
+		return fmt.Errorf("cartesia transcript or final marker is required")
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.final {
+		return fmt.Errorf("cartesia text already finalized")
 	}
 	request := s.request
 	request.Transcript = chunk.Text
 	request.Continue = !chunk.Final
-	return s.writeJSON(ctx, request)
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	if err := s.connection.Write(ctx, websocket.MessageText, payload); err != nil {
+		return err
+	}
+	if chunk.Final {
+		s.final = true
+	}
+	return nil
 }
 
 func (s *stream) Events() <-chan ai.TTSEvent { return s.events }
@@ -123,9 +144,9 @@ func (s *stream) readLoop() {
 				s.emit(ai.TTSEvent{Err: err})
 				return
 			}
-			s.emit(ai.TTSEvent{Audio: frame, ProviderID: msg.RequestID})
+			s.emit(ai.TTSEvent{Audio: frame, ProviderID: msg.ContextID})
 		case "done":
-			s.emit(ai.TTSEvent{ProviderID: msg.RequestID, Done: true})
+			s.emit(ai.TTSEvent{ProviderID: msg.ContextID, Done: true})
 			return
 		}
 	}

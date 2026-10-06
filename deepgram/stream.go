@@ -91,6 +91,8 @@ func (s *stream) writeJSON(ctx context.Context, value any) error {
 }
 
 func (s *stream) readLoop() {
+	defer s.cancel()
+	defer func() { _ = s.connection.CloseNow() }()
 	defer close(s.done)
 	defer close(s.events)
 	for {

@@ -102,6 +102,8 @@ for event := range stream.Events() {
 }
 ```
 
+AssemblyAI emits `speech.started` on the first non-empty transcript for each upstream turn. This provides a normalized start event, but its timing depends on transcription latency rather than an immediate voice activity signal.
+
 ## Boundaries
 
 This repository does not own provider selection, agent definitions, tenant credential storage, orchestration, telephony, carrier integrations, or media session policy. Those concerns stay in the main Leamout runtime.

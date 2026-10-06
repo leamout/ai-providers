@@ -101,6 +101,8 @@ func (s *stream) readLoop() {
 	defer func() { _ = s.ws.Close() }()
 
 	providerID := ""
+	lastTurn := 0
+	hasTurn := false
 	for {
 		var upstream event
 		if err := s.ws.Read(&upstream); err != nil {
@@ -119,6 +121,13 @@ func (s *stream) readLoop() {
 			providerID = upstream.ID
 		case "Turn":
 			if upstream.Transcript != "" {
+				if !hasTurn || upstream.TurnOrder != lastTurn {
+					lastTurn = upstream.TurnOrder
+					hasTurn = true
+					if !s.emit(ai.STTEvent{Type: ai.STTEventSpeechStarted, ProviderID: providerID}) {
+						return
+					}
+				}
 				typeOfEvent := ai.STTEventTranscriptDelta
 				if upstream.End && (!s.formatTurns || upstream.Formatted) {
 					typeOfEvent = ai.STTEventTranscriptFinal

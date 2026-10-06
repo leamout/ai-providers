@@ -46,9 +46,10 @@ type streamOptions struct {
 }
 
 type completionChunk struct {
-	ID      string   `json:"id"`
-	Choices []choice `json:"choices"`
-	Usage   *usage   `json:"usage,omitempty"`
+	Error   *streamError `json:"error,omitempty"`
+	ID      string       `json:"id"`
+	Choices []choice     `json:"choices"`
+	Usage   *usage       `json:"usage,omitempty"`
 }
 
 type choice struct {
@@ -70,4 +71,8 @@ type usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+}
+
+type streamError struct {
+	Message string `json:"message"`
 }
