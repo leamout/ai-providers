@@ -3,8 +3,11 @@ package deepgram
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/coder/websocket"
 	"github.com/leamout/contracts/ai"
@@ -26,6 +29,8 @@ type stream struct {
 	done       chan struct{}
 	writeMu    sync.Mutex
 	closeOnce  sync.Once
+	closing    atomic.Bool
+	closeErr   error
 }
 
 func newStream(ctx context.Context, cancel context.CancelFunc, connection *websocket.Conn, format ai.AudioFormat) *stream {
@@ -40,6 +45,9 @@ func newStream(ctx context.Context, cancel context.CancelFunc, connection *webso
 }
 
 func (s *stream) SendAudio(ctx context.Context, frame ai.AudioFrame) error {
+	if ctx == nil {
+		return fmt.Errorf("deepgram context is required")
+	}
 	if err := frame.Validate(); err != nil {
 		return err
 	}
@@ -48,6 +56,9 @@ func (s *stream) SendAudio(ctx context.Context, frame ai.AudioFrame) error {
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
+	if s.closing.Load() {
+		return fmt.Errorf("deepgram stream is closing")
+	}
 	return s.connection.Write(ctx, websocket.MessageBinary, frame.Data)
 }
 
@@ -58,29 +69,45 @@ func (s *stream) Finalize(ctx context.Context) error {
 func (s *stream) Events() <-chan ai.STTEvent { return s.events }
 
 func (s *stream) Close(ctx context.Context) error {
-	var closeErr error
+	if ctx == nil {
+		return fmt.Errorf("deepgram context is required")
+	}
 	s.closeOnce.Do(func() {
+		select {
+		case <-s.done:
+			return
+		default:
+		}
+		s.closing.Store(true)
+		stop := context.AfterFunc(ctx, func() {
+			s.cancel()
+			_ = s.connection.CloseNow()
+		})
+		defer stop()
 		if err := s.writeJSON(ctx, map[string]string{"type": "CloseStream"}); err != nil {
 			s.cancel()
 			_ = s.connection.CloseNow()
-			closeErr = fmt.Errorf("close Deepgram stream: %w", err)
+			s.closeErr = fmt.Errorf("close Deepgram stream: %w", err)
 			return
 		}
 		select {
 		case <-s.done:
 		case <-ctx.Done():
-			s.cancel()
-			_ = s.connection.CloseNow()
-			closeErr = fmt.Errorf("close Deepgram stream: %w", ctx.Err())
-			return
+			s.closeErr = fmt.Errorf("close Deepgram stream: %w", ctx.Err())
+		}
+		if ctx.Err() != nil {
+			s.closeErr = fmt.Errorf("close Deepgram stream: %w", ctx.Err())
 		}
 		s.cancel()
 		_ = s.connection.CloseNow()
 	})
-	return closeErr
+	return s.closeErr
 }
 
 func (s *stream) writeJSON(ctx context.Context, value any) error {
+	if ctx == nil {
+		return fmt.Errorf("deepgram context is required")
+	}
 	payload, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -91,12 +118,24 @@ func (s *stream) writeJSON(ctx context.Context, value any) error {
 }
 
 func (s *stream) readLoop() {
+	defer s.cancel()
+	defer func() { _ = s.connection.CloseNow() }()
 	defer close(s.done)
 	defer close(s.events)
+	var pending *turnMessage
 	for {
 		messageType, payload, err := s.connection.Read(s.ctx)
 		if err != nil {
-			if s.ctx.Err() == nil && websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+			status := websocket.CloseStatus(err)
+			expected := s.closing.Load() && (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || status == websocket.StatusNormalClosure || status == websocket.StatusNoStatusRcvd)
+			if expected && s.ctx.Err() == nil {
+				if pending != nil {
+					pending.Event = "EndOfTurn"
+					for _, event := range mapTurnMessage(*pending) {
+						s.emit(event)
+					}
+				}
+			} else if s.ctx.Err() == nil && status != websocket.StatusNormalClosure {
 				s.emit(ai.STTEvent{Type: ai.STTEventError, Err: fmt.Errorf("read Deepgram stream: %w", err)})
 			}
 			return
@@ -113,6 +152,12 @@ func (s *stream) readLoop() {
 		if message.Type != "TurnInfo" {
 			continue
 		}
+		if message.Event == "EndOfTurn" {
+			pending = nil
+		} else if message.Transcript != "" {
+			copyOfMessage := message
+			pending = &copyOfMessage
+		}
 		for _, event := range mapTurnMessage(message) {
 			s.emit(event)
 		}
@@ -125,7 +170,17 @@ func mapTurnMessage(message turnMessage) []ai.STTEvent {
 	case "StartOfTurn":
 		base.Type = ai.STTEventSpeechStarted
 		return []ai.STTEvent{base}
-	case "EagerEndOfTurn":
+	case "TurnResumed":
+		base.Type = ai.STTEventSpeechStarted
+		result := []ai.STTEvent{base}
+		if message.Transcript != "" {
+			delta := base
+			delta.Type = ai.STTEventTranscriptDelta
+			delta.Text = message.Transcript
+			result = append(result, delta)
+		}
+		return result
+	case "Update", "EagerEndOfTurn":
 		if message.Transcript == "" {
 			return nil
 		}

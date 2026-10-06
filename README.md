@@ -84,7 +84,7 @@ Current defaults:
 | Groq | `llama-3.3-70b-versatile` |
 | OpenAI LLM | `gpt-4.1-mini` |
 | OpenAI Realtime | `gpt-realtime-2.1`; `wss://api.openai.com/v1/realtime` |
-| Gemini Realtime | `gemini-3.8-live`; Gemini Live WebSocket API |
+| Gemini Realtime | Gemini Live native-audio model; `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent` |
 | Cartesia | `sonic-3.6`; voice required through config or request |
 | ElevenLabs | `eleven_flash_v2_5`; voice required through config or request |
 
@@ -134,6 +134,8 @@ for event := range stream.Events() {
 }
 ```
 
+AssemblyAI maps native `SpeechStarted` events when the upstream model provides them. For models without that signal, it emits `speech.started` on the first non-empty transcript of each turn; this fallback depends on transcription latency. Speech stop is emitted once per completed turn, independently of transcript formatting.
+
 ### Realtime Engine
 
 The realtime path uses one provider to maintain a continuous bidirectional speech session. The provider receives streaming audio, emits streaming audio, and can surface normalized speech, transcript, response, usage, error, and tool-call events through the shared realtime contract.
@@ -148,9 +150,27 @@ Live speech-to-speech session
 Audio
 ```
 
-OpenAI Realtime and Gemini Live implement the same vendor-neutral `ai.Realtime` contract. A Voice Agent can therefore select either provider without changing the Agent Runtime engine boundary.
+OpenAI Realtime and Gemini Live implement the same vendor-neutral realtime contract, so the Agent Runtime can select either provider without changing its engine boundary.
 
-Gemini Live accepts raw mono PCM16LE audio and returns 24 kHz mono PCM16LE audio. The adapter also maps Gemini input/output transcription, function calls, usage metadata, interruptions, and native barge-in behavior into the shared realtime contract.
+## Cartesia buffering and interruption
+
+Cartesia defaults to an explicit `max_buffer_delay_ms` of 3000. Set it to `0` when the runtime already aggregates text into phrases; use a positive value when streaming tokens directly. The adapter accepts 0–5000 ms and preserves an explicit zero on every context input, including the final marker.
+
+```json
+{"model":"sonic-3.6","voice_id":"your-voice-id","max_buffer_delay_ms":0}
+```
+
+Cartesia concatenates transcripts verbatim, so the runtime must preserve token whitespace. Audio, completion, and upstream error events use the context ID for `ProviderID`. Use `errors.As` with `*cartesia.Error` to inspect the upstream request ID, error code, and status code.
+
+On caller interruption, the runtime must immediately stop playback and discard queued audio from the interrupted response. Cartesia cancellation stops pending generation, but active generation may continue. Closing the synthesis stream releases the connection; it does not clear audio already queued in the runtime.
+
+## Deepgram Flux transcript and shutdown semantics
+
+Deepgram `transcript.delta` events contain the complete current turn transcript, not append-only text fragments. Replace the displayed interim transcript on each update and use `transcript.final` as the committed turn text. `Update` and `EagerEndOfTurn` are interim snapshots; an eager event never commits a turn.
+
+`TurnResumed` maps to `speech.started` followed by the latest interim transcript. The runtime must use this interruption signal to cancel any speculative response and stop playback. Consumers must tolerate another speech-start signal within the same unfinished turn.
+
+Keep consuming events while calling `Close(ctx)`: Flux drains remaining audio into updates before closing. On an expected server disconnect after `CloseStream`, the adapter commits the last unfinished transcript and emits speech stop. A turn already finalized by `EndOfTurn` is not committed again. `Finalize(ctx)` sends `ForceEndTurn` and leaves the stream open; it is separate from closing the stream.
 
 ## Boundaries
 

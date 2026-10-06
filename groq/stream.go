@@ -1,14 +1,13 @@
 package groq
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -45,27 +44,25 @@ func (s *stream) Close() error {
 
 func (s *stream) readLoop() {
 	defer close(s.events)
+	stop := context.AfterFunc(s.ctx, func() { _ = s.body.Close() })
+	defer stop()
 	defer func() { _ = s.Close() }()
 
-	scanner := bufio.NewScanner(s.body)
-	scanner.Buffer(make([]byte, 64<<10), 1<<20)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, ":") || !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if data == "[DONE]" {
+	completed := false
+	err := transport.ReadSSE(s.body, func(data []byte) error {
+		if string(data) == "[DONE]" {
 			s.emit(ai.LLMEvent{Done: true})
-			return
+			completed = true
+			return io.EOF
 		}
 
 		var chunk completionChunk
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			s.emit(ai.LLMEvent{Err: fmt.Errorf("decode Groq stream chunk: %w", err)})
-			return
+		if err := json.Unmarshal(data, &chunk); err != nil {
+			return fmt.Errorf("decode Groq stream chunk: %w", err)
 		}
-
+		if chunk.Error != nil {
+			return fmt.Errorf("groq stream: %s", chunk.Error.Message)
+		}
 		if chunk.Usage != nil {
 			s.emit(ai.LLMEvent{
 				ResponseID:   chunk.ID,
@@ -74,13 +71,9 @@ func (s *stream) readLoop() {
 				TotalTokens:  chunk.Usage.TotalTokens,
 			})
 		}
-
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
-				s.emit(ai.LLMEvent{
-					ResponseID: chunk.ID,
-					TextDelta:  choice.Delta.Content,
-				})
+				s.emit(ai.LLMEvent{ResponseID: chunk.ID, TextDelta: choice.Delta.Content})
 			}
 			for _, call := range choice.Delta.ToolCalls {
 				s.emit(ai.LLMEvent{
@@ -92,10 +85,14 @@ func (s *stream) readLoop() {
 				})
 			}
 		}
-	}
+		return nil
+	})
 
-	if err := scanner.Err(); err != nil && s.ctx.Err() == nil {
+	if err != nil && s.ctx.Err() == nil {
 		s.emit(ai.LLMEvent{Err: fmt.Errorf("read Groq stream: %w", err)})
+	}
+	if err == nil && !completed && s.ctx.Err() == nil {
+		s.emit(ai.LLMEvent{Err: io.ErrUnexpectedEOF})
 	}
 }
 
