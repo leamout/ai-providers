@@ -3,9 +3,9 @@ package gemini
 import "encoding/json"
 
 type realtimeClientMessage struct {
-	Setup         *realtimeSetup         `json:"setup,omitempty"`
-	RealtimeInput *realtimeInput         `json:"realtimeInput,omitempty"`
-	ToolResponse  *realtimeToolResponse  `json:"toolResponse,omitempty"`
+	Setup         *realtimeSetup        `json:"setup,omitempty"`
+	RealtimeInput *realtimeInput        `json:"realtimeInput,omitempty"`
+	ToolResponse  *realtimeToolResponse `json:"toolResponse,omitempty"`
 }
 
 type realtimeSetup struct {
@@ -40,8 +40,8 @@ type realtimeContent struct {
 }
 
 type realtimePart struct {
-	Text       string          `json:"text,omitempty"`
-	InlineData *realtimeBlob   `json:"inlineData,omitempty"`
+	Text       string        `json:"text,omitempty"`
+	InlineData *realtimeBlob `json:"inlineData,omitempty"`
 }
 
 type realtimeBlob struct {
@@ -82,13 +82,13 @@ type realtimeServerMessage struct {
 }
 
 type realtimeServerContent struct {
-	ModelTurn                *realtimeContent       `json:"modelTurn,omitempty"`
-	GenerationComplete       bool                   `json:"generationComplete,omitempty"`
-	TurnComplete             bool                   `json:"turnComplete,omitempty"`
-	Interrupted              bool                   `json:"interrupted,omitempty"`
+	ModelTurn                 *realtimeContent       `json:"modelTurn,omitempty"`
+	GenerationComplete        bool                   `json:"generationComplete,omitempty"`
+	TurnComplete              bool                   `json:"turnComplete,omitempty"`
+	Interrupted               bool                   `json:"interrupted,omitempty"`
 	InterimInputTranscription *realtimeTranscription `json:"interimInputTranscription,omitempty"`
-	InputTranscription       *realtimeTranscription `json:"inputTranscription,omitempty"`
-	OutputTranscription      *realtimeTranscription `json:"outputTranscription,omitempty"`
+	InputTranscription        *realtimeTranscription `json:"inputTranscription,omitempty"`
+	OutputTranscription       *realtimeTranscription `json:"outputTranscription,omitempty"`
 }
 
 type realtimeTranscription struct {
