@@ -99,7 +99,7 @@ func (s *stream) SubmitToolResult(ctx context.Context, result ai.ToolResult) err
 	})
 }
 
-func (s *stream) Audio() <-chan ai.AudioFrame { return s.audio }
+func (s *stream) Audio() <-chan ai.AudioFrame     { return s.audio }
 func (s *stream) Events() <-chan ai.RealtimeEvent { return s.events }
 
 func (s *stream) Close(context.Context) error {
@@ -230,7 +230,7 @@ func (s *stream) handleServerContent(content realtimeServerContent, now time.Tim
 		}
 		if text := content.InterimInputTranscription.Text; text != "" {
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventTranscriptDelta,
+				Type:       ai.RealtimeEventTranscriptDelta,
 				Transcript: &ai.TranscriptEvent{Text: text},
 				OccurredAt: now,
 			})
@@ -240,7 +240,7 @@ func (s *stream) handleServerContent(content realtimeServerContent, now time.Tim
 	if content.InputTranscription != nil {
 		if text := content.InputTranscription.Text; text != "" {
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventTranscriptFinal,
+				Type:       ai.RealtimeEventTranscriptFinal,
 				Transcript: &ai.TranscriptEvent{Text: text},
 				OccurredAt: now,
 			})
@@ -255,8 +255,8 @@ func (s *stream) handleServerContent(content realtimeServerContent, now time.Tim
 		if text := content.OutputTranscription.Text; text != "" {
 			s.ensureResponseStarted(now)
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventResponseDelta,
-				Response: &ai.ResponseEvent{Text: text},
+				Type:       ai.RealtimeEventResponseDelta,
+				Response:   &ai.ResponseEvent{Text: text},
 				OccurredAt: now,
 			})
 		}
@@ -270,8 +270,8 @@ func (s *stream) handleServerContent(content realtimeServerContent, now time.Tim
 			audio, err := base64.StdEncoding.DecodeString(part.InlineData.Data)
 			if err != nil {
 				s.emit(ai.RealtimeEvent{
-					Type: ai.RealtimeEventError,
-					Failure: &ai.Failure{Source: "gemini", Message: err.Error()},
+					Type:       ai.RealtimeEventError,
+					Failure:    &ai.Failure{Source: "gemini", Message: err.Error()},
 					OccurredAt: now,
 				})
 				continue
