@@ -70,10 +70,11 @@ func (c *client) start(ctx context.Context, credential string, cfg Config, forma
 	streamCtx, cancel := context.WithCancel(ctx)
 	result := newStream(streamCtx, cancel, connection, format, contextID)
 	result.request = generationRequest{
-		ModelID:   cfg.Model,
-		Voice:     cfg.VoiceID,
-		Language:  cfg.Language,
-		ContextID: contextID,
+		MaxBufferDelayMS: cfg.MaxBufferDelayMS,
+		ModelID:          cfg.Model,
+		Voice:            cfg.VoiceID,
+		Language:         cfg.Language,
+		ContextID:        contextID,
 		OutputFormat: outputFormat{
 			Container:  "raw",
 			Encoding:   "pcm_s16le",

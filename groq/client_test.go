@@ -35,8 +35,11 @@ func TestGenerateTranslatesRequestAndEvents(t *testing.T) {
 
 		body := strings.Join([]string{
 			`data: {"id":"resp-1","choices":[{"delta":{"content":"hello"}}]}`,
+			"",
 			`data: {"id":"resp-1","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call-1","function":{"name":"lookup","arguments":"{\"id\":"}}]}}]}`,
+			"",
 			`data: {"id":"resp-1","choices":[],"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}`,
+			"",
 			`data: [DONE]`,
 			"",
 		}, "\n")

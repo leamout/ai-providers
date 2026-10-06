@@ -19,13 +19,14 @@ type outputFormat struct {
 }
 
 type generationRequest struct {
-	ModelID      string       `json:"model_id"`
-	Transcript   string       `json:"transcript"`
-	Voice        string       `json:"voice"`
-	Language     string       `json:"language,omitempty"`
-	ContextID    string       `json:"context_id"`
-	OutputFormat outputFormat `json:"output_format"`
-	Continue     bool         `json:"continue"`
+	MaxBufferDelayMS *int         `json:"max_buffer_delay_ms,omitempty"`
+	ModelID          string       `json:"model_id"`
+	Transcript       string       `json:"transcript"`
+	Voice            string       `json:"voice"`
+	Language         string       `json:"language,omitempty"`
+	ContextID        string       `json:"context_id"`
+	OutputFormat     outputFormat `json:"output_format"`
+	Continue         bool         `json:"continue"`
 }
 
 type response struct {
@@ -33,6 +34,7 @@ type response struct {
 	Data       string `json:"data"`
 	StatusCode int    `json:"status_code"`
 	RequestID  string `json:"request_id"`
+	ContextID  string `json:"context_id"`
 	Message    string `json:"message"`
 	ErrorCode  string `json:"error_code"`
 }
@@ -47,6 +49,7 @@ type stream struct {
 	events     chan ai.TTSEvent
 	writeMu    sync.Mutex
 	closeOnce  sync.Once
+	final      bool
 }
 
 func newStream(ctx context.Context, cancel context.CancelFunc, connection *websocket.Conn, format ai.AudioFormat, contextID string) *stream {
@@ -54,13 +57,32 @@ func newStream(ctx context.Context, cancel context.CancelFunc, connection *webso
 }
 
 func (s *stream) SendText(ctx context.Context, chunk ai.TextChunk) error {
-	if chunk.Text == "" {
-		return fmt.Errorf("cartesia transcript is required")
+	if ctx == nil {
+		return fmt.Errorf("cartesia context is required")
+	}
+	if chunk.Text == "" && !chunk.Final {
+		return fmt.Errorf("cartesia transcript or final marker is required")
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.final {
+		return fmt.Errorf("cartesia text already finalized")
 	}
 	request := s.request
 	request.Transcript = chunk.Text
 	request.Continue = !chunk.Final
-	return s.writeJSON(ctx, request)
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	if err := s.connection.Write(ctx, websocket.MessageText, payload); err != nil {
+		return err
+	}
+	if chunk.Final {
+		s.final = true
+	}
+	return nil
 }
 
 func (s *stream) Events() <-chan ai.TTSEvent { return s.events }
@@ -70,6 +92,12 @@ func (s *stream) Close() error {
 	s.closeOnce.Do(func() {
 		closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+		// The watchdog must not acquire writeMu: a stalled writer can hold it.
+		stop := context.AfterFunc(closeCtx, func() {
+			s.cancel()
+			_ = s.connection.CloseNow()
+		})
+		defer stop()
 		_ = s.writeJSON(closeCtx, map[string]any{"context_id": s.contextID, "cancel": true})
 		s.cancel()
 		err = s.connection.CloseNow()
@@ -108,7 +136,7 @@ func (s *stream) readLoop() {
 			return
 		}
 		if msg.Type == "error" || msg.StatusCode >= 400 {
-			s.emit(ai.TTSEvent{ProviderID: msg.RequestID, Err: fmt.Errorf("cartesia %s: %s", msg.ErrorCode, msg.Message)})
+			s.emit(ai.TTSEvent{ProviderID: msg.ContextID, Err: &Error{Code: msg.ErrorCode, Message: msg.Message, RequestID: msg.RequestID, ContextID: msg.ContextID, StatusCode: msg.StatusCode}})
 			return
 		}
 		switch msg.Type {
@@ -123,9 +151,9 @@ func (s *stream) readLoop() {
 				s.emit(ai.TTSEvent{Err: err})
 				return
 			}
-			s.emit(ai.TTSEvent{Audio: frame, ProviderID: msg.RequestID})
+			s.emit(ai.TTSEvent{Audio: frame, ProviderID: msg.ContextID})
 		case "done":
-			s.emit(ai.TTSEvent{ProviderID: msg.RequestID, Done: true})
+			s.emit(ai.TTSEvent{ProviderID: msg.ContextID, Done: true})
 			return
 		}
 	}
