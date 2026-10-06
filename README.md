@@ -34,7 +34,7 @@ A Voice Agent uses one engine path for a session. Realtime is an alternative to 
       STT      LLM      TTS              Realtime
 
    Deepgram    Groq    Cartesia            OpenAI
-   AssemblyAI  OpenAI  ElevenLabs
+   AssemblyAI  OpenAI  ElevenLabs          Gemini
 ```
 
 The initial catalog keeps the composable surface deliberately small while making realtime a first-class provider kind. Additional vendors can be added behind the same contracts without changing Agent Runtime orchestration.
@@ -48,6 +48,7 @@ The initial catalog keeps the composable surface deliberately small while making
 | TTS | `cartesia.Provider` | WebSocket | `cartesia.Config` |
 | TTS | `elevenlabs.Provider` | WebSocket | `elevenlabs.Config` |
 | Realtime | `openai.RealtimeProvider` | WebSocket | `openai.RealtimeConfig` |
+| Realtime | `gemini.RealtimeProvider` | WebSocket | `gemini.RealtimeConfig` |
 
 ## Repository layout
 
@@ -83,6 +84,7 @@ Current defaults:
 | Groq | `llama-3.3-70b-versatile` |
 | OpenAI LLM | `gpt-4.1-mini` |
 | OpenAI Realtime | `gpt-realtime-2.1`; `wss://api.openai.com/v1/realtime` |
+| Gemini Realtime | `gemini-3.8-live`; Gemini Live WebSocket API |
 | Cartesia | `sonic-3.6`; voice required through config or request |
 | ElevenLabs | `eleven_flash_v2_5`; voice required through config or request |
 
@@ -146,7 +148,9 @@ Live speech-to-speech session
 Audio
 ```
 
-OpenAI is the first realtime provider in the catalog. The contract is vendor-neutral, so additional realtime providers can be registered later without changing the Agent Runtime's engine boundary.
+OpenAI Realtime and Gemini Live implement the same vendor-neutral `ai.Realtime` contract. A Voice Agent can therefore select either provider without changing the Agent Runtime engine boundary.
+
+Gemini Live accepts raw mono PCM16LE audio and returns 24 kHz mono PCM16LE audio. The adapter also maps Gemini input/output transcription, function calls, usage metadata, interruptions, and native barge-in behavior into the shared realtime contract.
 
 ## Boundaries
 
