@@ -135,3 +135,15 @@ Provider tests use local HTTP/WebSocket fixtures and do not require live vendor 
 ## License
 
 Apache License 2.0.
+
+## Cartesia buffering and interruption
+
+Cartesia defaults to an explicit `max_buffer_delay_ms` of 3000. Set it to `0` when the runtime already aggregates text into phrases; use a positive value when streaming tokens directly. The adapter accepts 0–5000 ms and preserves an explicit zero on every context input, including the final marker.
+
+```json
+{"model":"sonic-3.6","voice_id":"your-voice-id","max_buffer_delay_ms":0}
+```
+
+Cartesia concatenates transcripts verbatim, so the runtime must preserve token whitespace. Audio, completion, and upstream error events use the context ID for `ProviderID`. Use `errors.As` with `*cartesia.Error` to inspect the upstream request ID, error code, and status code.
+
+On caller interruption, the runtime must immediately stop playback and discard queued audio from the interrupted response. Cartesia cancellation stops pending generation, but active generation may continue. Closing the synthesis stream releases the connection; it does not clear audio already queued in the runtime.

@@ -19,13 +19,14 @@ type outputFormat struct {
 }
 
 type generationRequest struct {
-	ModelID      string       `json:"model_id"`
-	Transcript   string       `json:"transcript"`
-	Voice        string       `json:"voice"`
-	Language     string       `json:"language,omitempty"`
-	ContextID    string       `json:"context_id"`
-	OutputFormat outputFormat `json:"output_format"`
-	Continue     bool         `json:"continue"`
+	MaxBufferDelayMS *int         `json:"max_buffer_delay_ms,omitempty"`
+	ModelID          string       `json:"model_id"`
+	Transcript       string       `json:"transcript"`
+	Voice            string       `json:"voice"`
+	Language         string       `json:"language,omitempty"`
+	ContextID        string       `json:"context_id"`
+	OutputFormat     outputFormat `json:"output_format"`
+	Continue         bool         `json:"continue"`
 }
 
 type response struct {
@@ -135,7 +136,7 @@ func (s *stream) readLoop() {
 			return
 		}
 		if msg.Type == "error" || msg.StatusCode >= 400 {
-			s.emit(ai.TTSEvent{ProviderID: msg.RequestID, Err: fmt.Errorf("cartesia %s: %s", msg.ErrorCode, msg.Message)})
+			s.emit(ai.TTSEvent{ProviderID: msg.ContextID, Err: &Error{Code: msg.ErrorCode, Message: msg.Message, RequestID: msg.RequestID, ContextID: msg.ContextID, StatusCode: msg.StatusCode}})
 			return
 		}
 		switch msg.Type {
