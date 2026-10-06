@@ -165,7 +165,7 @@ func (s *realtimeStream) SubmitToolResult(ctx context.Context, result ai.ToolRes
 	return s.writeJSON(ctx, realtimeClientEvent{Type: "response.create"})
 }
 
-func (s *realtimeStream) Audio() <-chan ai.AudioFrame { return s.audio }
+func (s *realtimeStream) Audio() <-chan ai.AudioFrame     { return s.audio }
 func (s *realtimeStream) Events() <-chan ai.RealtimeEvent { return s.events }
 
 func (s *realtimeStream) Close(context.Context) error {
@@ -196,8 +196,8 @@ func (s *realtimeStream) readLoop() {
 		if err != nil {
 			if s.ctx.Err() == nil && websocket.CloseStatus(err) != websocket.StatusNormalClosure {
 				s.emit(ai.RealtimeEvent{
-					Type: ai.RealtimeEventError,
-					Failure: &ai.Failure{Source: "openai", Message: fmt.Sprintf("read OpenAI Realtime: %v", err), Terminal: true},
+					Type:       ai.RealtimeEventError,
+					Failure:    &ai.Failure{Source: "openai", Message: fmt.Sprintf("read OpenAI Realtime: %v", err), Terminal: true},
 					OccurredAt: time.Now().UTC(),
 				})
 			}
@@ -205,8 +205,8 @@ func (s *realtimeStream) readLoop() {
 		}
 		if kind != websocket.MessageText {
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventError,
-				Failure: &ai.Failure{Source: "openai", Message: "OpenAI Realtime returned a non-text event", Terminal: true},
+				Type:       ai.RealtimeEventError,
+				Failure:    &ai.Failure{Source: "openai", Message: "OpenAI Realtime returned a non-text event", Terminal: true},
 				OccurredAt: time.Now().UTC(),
 			})
 			return
@@ -214,8 +214,8 @@ func (s *realtimeStream) readLoop() {
 		var event realtimeServerEvent
 		if err := json.Unmarshal(payload, &event); err != nil {
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventError,
-				Failure: &ai.Failure{Source: "openai", Message: fmt.Sprintf("decode OpenAI Realtime event: %v", err), Terminal: true},
+				Type:       ai.RealtimeEventError,
+				Failure:    &ai.Failure{Source: "openai", Message: fmt.Sprintf("decode OpenAI Realtime event: %v", err), Terminal: true},
 				OccurredAt: time.Now().UTC(),
 			})
 			return
@@ -276,8 +276,8 @@ func (s *realtimeStream) handle(event realtimeServerEvent) {
 		}
 		if !json.Valid([]byte(arguments)) {
 			s.emit(ai.RealtimeEvent{
-				Type: ai.RealtimeEventError,
-				Failure: &ai.Failure{Source: "openai", Code: "invalid_tool_arguments", Message: "OpenAI Realtime returned invalid tool arguments"},
+				Type:       ai.RealtimeEventError,
+				Failure:    &ai.Failure{Source: "openai", Code: "invalid_tool_arguments", Message: "OpenAI Realtime returned invalid tool arguments"},
 				ProviderID: providerID,
 				OccurredAt: now,
 			})
