@@ -147,3 +147,11 @@ Cartesia defaults to an explicit `max_buffer_delay_ms` of 3000. Set it to `0` wh
 Cartesia concatenates transcripts verbatim, so the runtime must preserve token whitespace. Audio, completion, and upstream error events use the context ID for `ProviderID`. Use `errors.As` with `*cartesia.Error` to inspect the upstream request ID, error code, and status code.
 
 On caller interruption, the runtime must immediately stop playback and discard queued audio from the interrupted response. Cartesia cancellation stops pending generation, but active generation may continue. Closing the synthesis stream releases the connection; it does not clear audio already queued in the runtime.
+
+## Deepgram Flux transcript and shutdown semantics
+
+Deepgram `transcript.delta` events contain the complete current turn transcript, not append-only text fragments. Replace the displayed interim transcript on each update and use `transcript.final` as the committed turn text. `Update` and `EagerEndOfTurn` are interim snapshots; an eager event never commits a turn.
+
+`TurnResumed` maps to `speech.started` followed by the latest interim transcript. The runtime must use this interruption signal to cancel any speculative response and stop playback. Consumers must tolerate another speech-start signal within the same unfinished turn.
+
+Keep consuming events while calling `Close(ctx)`: Flux drains remaining audio into updates before closing. On an expected server disconnect after `CloseStream`, the adapter commits the last unfinished transcript and emits speech stop. A turn already finalized by `EndOfTurn` is not committed again. `Finalize(ctx)` sends `ForceEndTurn` and leaves the stream open; it is separate from closing the stream.
