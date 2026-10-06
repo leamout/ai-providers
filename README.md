@@ -12,22 +12,32 @@ leamout/ai-providers
 leamout/leamout
 ```
 
-## Initial provider catalog
+## Provider catalog
 
-The first composable Agent Runtime intentionally starts with two providers per layer:
+The Agent Runtime supports two alternative AI execution models:
+
+- **Composable Engine** — independently selects STT, LLM, and TTS providers.
+- **Realtime Engine** — uses one realtime speech-to-speech provider for the live conversation.
+
+A Voice Agent uses one engine path for a session. Realtime is an alternative to the composable STT → LLM → TTS pipeline; it is not a fourth provider that must be configured alongside the other three.
 
 ```text
-                    Agent Runtime
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-         STT            LLM            TTS
+                         Agent Runtime
+                              │
+                ┌─────────────┴─────────────┐
+                │                           │
+                ▼                           ▼
+        Composable Engine            Realtime Engine
+                │                           │
+       ┌────────┼────────┐                  │
+       ▼        ▼        ▼                  ▼
+      STT      LLM      TTS              Realtime
 
-      Deepgram         Groq          Cartesia
-      AssemblyAI       OpenAI        ElevenLabs
+   Deepgram    Groq    Cartesia            OpenAI
+   AssemblyAI  OpenAI  ElevenLabs
 ```
 
-This is enough to validate provider-independent composition without expanding the integration surface faster than the runtime itself.
+The initial catalog keeps the composable surface deliberately small while making realtime a first-class provider kind. Additional vendors can be added behind the same contracts without changing Agent Runtime orchestration.
 
 | Role | Adapter | Transport | Configuration |
 | --- | --- | --- | --- |
@@ -37,8 +47,7 @@ This is enough to validate provider-independent composition without expanding th
 | LLM | `openai.Provider` | HTTP + SSE | `openai.Config` |
 | TTS | `cartesia.Provider` | WebSocket | `cartesia.Config` |
 | TTS | `elevenlabs.Provider` | WebSocket | `elevenlabs.Config` |
-
-Additional vendors and realtime speech-to-speech providers are deferred until this initial catalog and the Agent Runtime are stable.
+| Realtime | `openai.RealtimeProvider` | WebSocket | `openai.RealtimeConfig` |
 
 ## Repository layout
 
@@ -55,6 +64,8 @@ Packages are organized by vendor rather than role. Each package follows the same
 └── ...
 ```
 
+A vendor package can implement more than one contract. For example, `openai.Provider` implements the LLM contract while `openai.RealtimeProvider` implements the realtime speech-to-speech contract.
+
 `config.go` owns provider defaults and runtime configuration validation. `provider.go` is the contracts adapter boundary. `client.go` owns upstream authentication, request construction, and connection setup. `stream.go` owns live stream lifecycle and normalized contract events. `model.go` contains vendor wire types when they justify a separate file.
 
 Shared code under `internal/` is intentionally limited to low-level transport mechanics. Provider-specific lifecycle and protocol behavior belongs in the vendor package.
@@ -70,13 +81,32 @@ Current defaults:
 | Deepgram | Flux `flux-general-en` |
 | AssemblyAI | `universal-streaming-english` |
 | Groq | `llama-3.3-70b-versatile` |
-| OpenAI | `gpt-4.1-mini` |
+| OpenAI LLM | `gpt-4.1-mini` |
+| OpenAI Realtime | `gpt-realtime-2.1`; `wss://api.openai.com/v1/realtime` |
 | Cartesia | `sonic-3.6`; voice required through config or request |
 | ElevenLabs | `eleven_flash_v2_5`; voice required through config or request |
 
-## Composition
+## Execution models
+
+### Composable Engine
 
 The runtime selects STT, LLM, and TTS independently. For example, a call can use AssemblyAI for transcription, OpenAI for reasoning and tool calls, and Cartesia for synthesis without any provider-specific orchestration logic in the Agent Runtime.
+
+```text
+Audio
+  ↓
+STT
+  ↓
+Text
+  ↓
+LLM
+  ↓
+Text
+  ↓
+TTS
+  ↓
+Audio
+```
 
 ```go
 llm := openai.Provider{HTTPClient: httpClient}
@@ -101,6 +131,22 @@ for event := range stream.Events() {
     // Forward event.TextDelta to the runtime's response pipeline.
 }
 ```
+
+### Realtime Engine
+
+The realtime path uses one provider to maintain a continuous bidirectional speech session. The provider receives streaming audio, emits streaming audio, and can surface normalized speech, transcript, response, usage, error, and tool-call events through the shared realtime contract.
+
+```text
+Audio
+  ↓
+Realtime Provider
+  ↕
+Live speech-to-speech session
+  ↓
+Audio
+```
+
+OpenAI is the first realtime provider in the catalog. The contract is vendor-neutral, so additional realtime providers can be registered later without changing the Agent Runtime's engine boundary.
 
 ## Boundaries
 
