@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -14,7 +15,8 @@ const verifyEndpoint = "https://api.groq.com/openai/v1/models"
 
 // Provider implements Groq streaming language-model generation.
 type Provider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (Provider) Descriptor() ai.Descriptor {
@@ -30,9 +32,16 @@ func (Provider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (Provider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeConfig(raw)
-	return err
+func (p Provider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p Provider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultEndpoint, p.AllowedEndpoints)
 }
 
 func (p Provider) VerifyCredential(ctx context.Context, credential string) error {
@@ -40,10 +49,7 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 	if credential == "" {
 		return fmt.Errorf("groq credential is required")
 	}
-	client := p.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := transport.Client(p.HTTPClient)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyEndpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create Groq credential verification request: %w", err)
@@ -63,6 +69,9 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 func (p Provider) Generate(ctx context.Context, request ai.LLMRequest) (ai.LLMStream, error) {
 	cfg, err := decodeConfig(request.Runtime.Config)
 	if err != nil {
+		return nil, err
+	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
 		return nil, err
 	}
 	return newClient(p.HTTPClient).generate(ctx, request.Runtime.Credential, cfg, request)

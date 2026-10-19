@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -14,7 +15,8 @@ const verifyEndpoint = "https://api.cartesia.ai/models"
 
 // Provider implements Cartesia streaming text-to-speech.
 type Provider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (Provider) Descriptor() ai.Descriptor {
@@ -28,9 +30,16 @@ func (Provider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (Provider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeConfig(raw)
-	return err
+func (p Provider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p Provider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultEndpoint, p.AllowedEndpoints)
 }
 
 func (p Provider) VerifyCredential(ctx context.Context, credential string) error {
@@ -38,10 +47,7 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 	if credential == "" {
 		return fmt.Errorf("cartesia credential is required")
 	}
-	client := p.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := transport.Client(p.HTTPClient)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyEndpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create Cartesia credential verification request: %w", err)
@@ -62,6 +68,9 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 func (p Provider) StartTTS(ctx context.Context, request ai.TTSRequest) (ai.TTSStream, error) {
 	cfg, err := decodeConfig(request.Runtime.Config)
 	if err != nil {
+		return nil, err
+	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
 		return nil, err
 	}
 	if voice := strings.TrimSpace(request.Voice); voice != "" {

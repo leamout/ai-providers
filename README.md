@@ -140,6 +140,21 @@ Tenant credentials are supplied through `ai.Runtime.Credential`. Provider-specif
 
 Adapters do not persist credentials or tenant configuration.
 
+### Trusted upstream endpoints
+
+Provider bindings may choose models and vendor settings, but cannot redirect credentials to an arbitrary host. Every adapter accepts its official endpoint by default. A custom endpoint must be explicitly authorized by the embedding Go application through the provider's `AllowedEndpoints` field; this field is **not** part of tenant-supplied JSON configuration.
+
+For example, an operator-controlled development setup can use:
+
+```go
+provider := groq.Provider{
+    HTTPClient: client,
+    AllowedEndpoints: []string{"https://proxy.example.com/v1/chat/completions"},
+}
+```
+
+Only supply endpoints from a trusted application configuration. For production, also enforce outbound network policy and private-address restrictions at the egress boundary. No user-provided manifest or tenant API field should populate `AllowedEndpoints`.
+
 Current defaults include:
 
 | Provider | Default / requirement |
@@ -199,7 +214,7 @@ Provider packages must not depend on `github.com/leamout/leamout`.
 
 ## Development
 
-The module targets Go 1.26.6.
+The module targets Go 1.26.9.
 
 ```bash
 go test ./...

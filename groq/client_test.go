@@ -50,7 +50,10 @@ func TestGenerateTranslatesRequestAndEvents(t *testing.T) {
 		}, nil
 	})}
 
-	provider := Provider{HTTPClient: client}
+	provider := Provider{
+		HTTPClient:       client,
+		AllowedEndpoints: []string{"https://example.test/v1/chat/completions"},
+	}
 	stream, err := provider.Generate(context.Background(), ai.LLMRequest{
 		Runtime: ai.Runtime{
 			Credential: "test-key",
