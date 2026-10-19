@@ -28,7 +28,12 @@ jobs:
           git diff --exit-code -- go.mod go.sum
 
       - name: Format
-        run: test -z "$(gofmt -l .)"
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            gofmt -d .
+            exit 1
+          fi
 
       - name: Vet
         run: go vet ./...
