@@ -2,8 +2,8 @@ package groq
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
