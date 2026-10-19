@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -15,7 +16,8 @@ const verifyEndpoint = "https://generativelanguage.googleapis.com/v1beta/models"
 
 // RealtimeProvider implements the Gemini Live realtime contract.
 type RealtimeProvider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (RealtimeProvider) Descriptor() ai.Descriptor {
@@ -33,9 +35,16 @@ func (RealtimeProvider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (RealtimeProvider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeRealtimeConfig(raw)
-	return err
+func (p RealtimeProvider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeRealtimeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p RealtimeProvider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultRealtimeEndpoint, p.AllowedEndpoints)
 }
 
 func (p RealtimeProvider) VerifyCredential(
@@ -47,10 +56,7 @@ func (p RealtimeProvider) VerifyCredential(
 		return fmt.Errorf("gemini credential is required")
 	}
 
-	client := p.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := transport.Client(p.HTTPClient)
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -86,6 +92,9 @@ func (p RealtimeProvider) StartRealtime(
 ) (ai.RealtimeStream, error) {
 	cfg, err := decodeRealtimeConfig(request.Runtime.Config)
 	if err != nil {
+		return nil, err
+	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
 		return nil, err
 	}
 

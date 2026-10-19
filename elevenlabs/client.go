@@ -17,7 +17,7 @@ type client struct {
 }
 
 func newClient(httpClient *http.Client) *client {
-	return &client{httpClient: httpClient}
+	return &client{httpClient: transport.Client(httpClient)}
 }
 
 func (c *client) verifyCredential(ctx context.Context, credential string) error {

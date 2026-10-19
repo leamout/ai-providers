@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/coder/websocket"
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -19,10 +20,7 @@ type client struct {
 }
 
 func newClient(httpClient *http.Client) *client {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	return &client{httpClient: httpClient}
+	return &client{httpClient: transport.Client(httpClient)}
 }
 
 func (c *client) generate(

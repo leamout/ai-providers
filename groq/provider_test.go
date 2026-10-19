@@ -2,6 +2,7 @@ package groq
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -50,5 +51,28 @@ func TestVerifyCredential(t *testing.T) {
 	})}
 	if err := (Provider{HTTPClient: client}).VerifyCredential(context.Background(), "test-key"); err != nil {
 		t.Fatalf("VerifyCredential() error = %v", err)
+	}
+}
+
+func TestGenerateRejectsUnapprovedEndpointBeforeDial(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		return nil, fmt.Errorf("unexpected outbound request")
+	})}
+	_, err := (Provider{HTTPClient: client}).Generate(context.Background(), ai.LLMRequest{
+		Runtime: ai.Runtime{
+			Credential: "secret",
+			Config:     json.RawMessage(`{"endpoint":"https://unapproved.example.test/v1/chat"}`),
+		},
+		Messages: []ai.Message{{Role: ai.RoleUser, Content: "hello"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not approved") {
+		t.Fatalf("Generate() error = %v, want endpoint rejection", err)
+	}
+	if called {
+		t.Fatal("unapproved endpoint caused an outbound request")
 	}
 }

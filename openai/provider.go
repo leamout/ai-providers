@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -15,7 +16,8 @@ const verifyEndpoint = "https://api.openai.com/v1/models"
 
 // Provider implements OpenAI streaming language-model generation.
 type Provider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (Provider) Descriptor() ai.Descriptor {
@@ -31,9 +33,16 @@ func (Provider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (Provider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeConfig(raw)
-	return err
+func (p Provider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p Provider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultEndpoint, p.AllowedEndpoints)
 }
 
 func (p Provider) VerifyCredential(
@@ -51,6 +60,9 @@ func (p Provider) Generate(
 	if err != nil {
 		return nil, err
 	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
+		return nil, err
+	}
 
 	return newClient(p.HTTPClient).generate(
 		ctx,
@@ -62,7 +74,8 @@ func (p Provider) Generate(
 
 // RealtimeProvider implements OpenAI Realtime speech-to-speech sessions.
 type RealtimeProvider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (RealtimeProvider) Descriptor() ai.Descriptor {
@@ -80,9 +93,16 @@ func (RealtimeProvider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (RealtimeProvider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeRealtimeConfig(raw)
-	return err
+func (p RealtimeProvider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeRealtimeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p RealtimeProvider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultRealtimeEndpoint, p.AllowedEndpoints)
 }
 
 func (p RealtimeProvider) VerifyCredential(
@@ -100,6 +120,9 @@ func (p RealtimeProvider) StartRealtime(
 	if err != nil {
 		return nil, err
 	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
+		return nil, err
+	}
 
 	return newClient(p.HTTPClient).start(ctx, cfg, request)
 }
@@ -114,10 +137,7 @@ func verifyCredential(
 		return fmt.Errorf("openai credential is required")
 	}
 
-	client := httpClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := transport.Client(httpClient)
 
 	req, err := http.NewRequestWithContext(
 		ctx,

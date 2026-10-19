@@ -21,12 +21,17 @@ func Endpoint(value, scheme string) error {
 	return nil
 }
 
-// Client returns c when provided, otherwise http.DefaultClient.
+// Client preserves the supplied transport and timeout while rejecting redirects.
+// Provider credentials must never be forwarded to another request destination.
 func Client(c *http.Client) *http.Client {
 	if c == nil {
-		return http.DefaultClient
+		c = http.DefaultClient
 	}
-	return c
+	safe := *c
+	safe.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &safe
 }
 
 // JSON sends an HTTP request, JSON-encoding payload when it is non-nil.

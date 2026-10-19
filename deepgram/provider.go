@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leamout/ai-providers/internal/transport"
 	"github.com/leamout/contracts/ai"
 )
 
@@ -14,7 +15,8 @@ const verifyEndpoint = "https://api.deepgram.com/v1/auth/token"
 
 // Provider implements Deepgram Flux streaming speech-to-text.
 type Provider struct {
-	HTTPClient *http.Client
+	HTTPClient       *http.Client
+	AllowedEndpoints []string
 }
 
 func (Provider) Descriptor() ai.Descriptor {
@@ -29,9 +31,16 @@ func (Provider) Descriptor() ai.Descriptor {
 	}
 }
 
-func (Provider) ValidateConfig(raw json.RawMessage) error {
-	_, err := decodeConfig(raw)
-	return err
+func (p Provider) ValidateConfig(raw json.RawMessage) error {
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		return err
+	}
+	return p.validateEndpoint(cfg.Endpoint)
+}
+
+func (p Provider) validateEndpoint(endpoint string) error {
+	return transport.AllowedEndpoint(endpoint, DefaultEndpoint, p.AllowedEndpoints)
 }
 
 func (p Provider) VerifyCredential(ctx context.Context, credential string) error {
@@ -39,10 +48,7 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 	if credential == "" {
 		return fmt.Errorf("deepgram credential is required")
 	}
-	client := p.HTTPClient
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client := transport.Client(p.HTTPClient)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, verifyEndpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create Deepgram credential verification request: %w", err)
@@ -62,6 +68,9 @@ func (p Provider) VerifyCredential(ctx context.Context, credential string) error
 func (p Provider) StartSTT(ctx context.Context, request ai.STTRequest) (ai.STTStream, error) {
 	cfg, err := decodeConfig(request.Runtime.Config)
 	if err != nil {
+		return nil, err
+	}
+	if err := p.validateEndpoint(cfg.Endpoint); err != nil {
 		return nil, err
 	}
 	if language := strings.TrimSpace(request.Language); language != "" && cfg.Model == "flux-general-multi" {
