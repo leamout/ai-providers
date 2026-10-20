@@ -69,6 +69,7 @@ func (c *client) start(
 		}
 		return nil, fmt.Errorf("connect Gemini Live: %w", err)
 	}
+	connection.SetReadLimit(transport.MaxWebSocketMessageBytes)
 
 	streamCtx, cancel := context.WithCancel(ctx)
 	result := &stream{
