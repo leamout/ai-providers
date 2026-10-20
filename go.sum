@@ -1,4 +1,4 @@
 github.com/coder/websocket v1.8.15 h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=
 github.com/coder/websocket v1.8.15/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
-github.com/leamout/contracts v0.0.0-20261005140544-dd4407421e49 h1:GR2xpK1xj4wExLfCKj4fNaDbA3AgK8Lju1E4bMeaCmI=
-github.com/leamout/contracts v0.0.0-20261005140544-dd4407421e49/go.mod h1:UMu3d57bCEkimVHB17CD6M6CbXPK9oKzhwxBkT0t+aI=
+github.com/leamout/contracts v0.1.0 h1:BbHY3VFUu9GDl0vHf/zFWdOn1CCTopjXosYlZXrvVSQ=
+github.com/leamout/contracts v0.1.0/go.mod h1:UMu3d57bCEkimVHB17CD6M6CbXPK9oKzhwxBkT0t+aI=
