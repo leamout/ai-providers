@@ -10,6 +10,11 @@ import (
 	"github.com/coder/websocket"
 )
 
+// MaxWebSocketMessageBytes bounds a single inbound WebSocket message to 4 MiB.
+// Realtime events can contain base64-encoded audio, so a small default limit
+// would reject otherwise valid messages.
+const MaxWebSocketMessageBytes int64 = 4 << 20
+
 type WS struct {
 	Conn   *websocket.Conn
 	Ctx    context.Context
@@ -32,7 +37,7 @@ func Dial(parent context.Context, c *http.Client, endpoint string, h http.Header
 		cancel()
 		return nil, e
 	}
-	conn.SetReadLimit(4 << 20)
+	conn.SetReadLimit(MaxWebSocketMessageBytes)
 	s := &WS{Conn: conn, Ctx: ctx, cancel: cancel}
 	s.stop = context.AfterFunc(ctx, func() { conn.CloseNow() })
 	return s, nil
